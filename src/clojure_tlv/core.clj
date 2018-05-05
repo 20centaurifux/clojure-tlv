@@ -1,7 +1,7 @@
 (ns clojure-tlv.core)
 
 (defn tlv-decoder
-  "Creates the initial tlv decoder state. f is applied to payload."
+  "Creates the initial TLV decoder state. f is applied to payload."
   [f & {:keys [type-map session-state] :or {type-map {}}}]
   {:state :tag
    :callback f
@@ -42,7 +42,7 @@
       (assoc-vectors [:type :required] (parse-tag (first bytes)))
       (tlv-decode (rest bytes))))
 
-;; Binds the specified vars to the corresponding values from m.
+;; Binds the specified vars to the corresponding values of m.
 ;; Example: (with-keys {:a 1 :b 2} [a b] (+ a b))
 (defmacro with-keys
   [m vars & body]
@@ -72,7 +72,7 @@
         (update (:state decoder) concat (take readable bytes))
         (tlv-decode-step (drop readable bytes)))))
 
-;; Converts a byte array to an integer (big endian).
+;; Converts a byte array to an integer.
 (defn- bytes->num
   [bytes]
   (if (empty? bytes)
@@ -100,6 +100,7 @@
       (select-keys [:callback :type-map :session-state])
       (assoc :state :tag)))
 
+;; Runs the associated callback function & updates session state.
 (defn- callback
   [decoder]
   (with-keys
@@ -118,3 +119,43 @@
         (tlv-decode bytes))
     (cond-> decoder
       (not-empty bytes) (read-next-bytes bytes))))
+
+;; Calculates the number of required header bytes.
+(defn- header-length
+  [l]
+  (cond
+    (> l 0xFFFF) :dword
+    (> l 0x00FF) :word
+    (> l 0x0000) :byte
+    :else :zero))
+
+(defn- tag
+  [t l]
+  (case (header-length l)
+    :dword (bit-or t 0XC0)
+    :word (bit-or t 0x80)
+    :byte (bit-or t 0x40)
+    :zero t))
+
+;; Converts a number to a byte array.
+(defn- num->bytes
+  [l]
+  (case (header-length l)
+    :zero []
+    :byte [l]
+    :word [(bit-shift-right (bit-and l 0xFF00) 8)
+           (bit-and 0xFF l)]
+    :dword [(bit-shift-right (bit-and l 0xFF000000) 24)
+            (bit-shift-right (bit-and l 0x00FF0000) 16)
+            (bit-shift-right (bit-and l 0x0000FF00) 8)
+            (bit-and l 0x000000FF)]))
+
+(defn tlv-header
+  "Returns a byte sequence containing package tag & length."
+  [t l]
+  (cons (tag t l) (num->bytes l)))
+
+(defn tlv-encode
+  "Builds & prepends a package header to a byte sequence."
+  [t payload]
+  (concat (tlv-header t (count payload)) payload))
