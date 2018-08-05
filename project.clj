@@ -1,4 +1,4 @@
-(defproject clojure-tlv "0.1.0-SNAPSHOT"
+(defproject zcfux/clojure-tlv "0.1.0-SNAPSHOT"
   :description "A TLV implementation in clojure."
   :url "https://github.com/20centaurifux/clojure-tlv"
   :license {:name "GPLv3"
