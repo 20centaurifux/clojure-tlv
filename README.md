@@ -2,6 +2,12 @@
 
 **clojure-tlv** is a type-length-value format implementation in Clojure.
 
+## Installation
+
+The library can be installed from Clojars using Leiningen:
+
+[![Clojars Project](http://clojars.org/zcfux/clojure-tlv/latest-version.svg)](https://clojars.org/zcfux/clojure-tlv)
+
 ## Package format
 
 A package consists of the following fields:
