@@ -1,12 +1,17 @@
 (ns clojure-tlv.core)
 
+(defn- options->map
+  [options]
+  {:pre [(or (nil? options) (even? (count options)))]}
+  (->
+    (apply hash-map options)
+    (select-keys [:type-map :session-state])))
+
 (defn tlv-decoder
   "Creates the initial TLV decoder state. f is applied to found TLV packages."
-  [f & {:keys [type-map session-state] :or {type-map {}}}]
-  {:state :tag
-   :callback f
-   :type-map type-map
-   :session-state session-state})
+  [f & options]
+  (merge {:state :tag :callback f}
+         (options->map options)))
 
 (defmulti ^:private tlv-decode-step :state)
 
@@ -161,3 +166,5 @@
   "Prepends package header to a byte sequence."
   [t payload]
   (concat (tlv-header t (count payload)) payload))
+
+(defn foobar [])
