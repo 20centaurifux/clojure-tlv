@@ -2,16 +2,15 @@
 
 (defn- options->map
   [options]
-  {:pre [(or (nil? options) (even? (count options)))]}
-  (->
-    (apply hash-map options)
-    (select-keys [:type-map :session-state])))
+  {:pre [(even? (count options))]}
+  (apply hash-map options))
 
 (defn tlv-decoder
   "Creates the initial TLV decoder state. f is applied to found TLV packages."
   [f & options]
   (merge {:state :tag :callback f}
-         (options->map options)))
+         (select-keys (options->map options)
+                      [:session-state :type-map])))
 
 (defmulti ^:private tlv-decode-step :state)
 
@@ -46,9 +45,12 @@
 
 (defn- reset-tlv-decoder
   [decoder]
-  (-> decoder
-      (select-keys [:callback :type-map :session-state])
+  (-> (select-keys decoder [:callback :type-map :session-state])
       (assoc :state :tag)))
+
+(defn- has-session?
+  [decoder]
+  (contains? decoder :session-state))
 
 ;; Runs the associated callback function & updates session state.
 (defn- callback
@@ -56,24 +58,35 @@
   (with-keys
     decoder
     [type-map type payload session-state callback]
-    (->> (cond-> [(get type-map type type) payload]
-           (not (nil? session-state)) (conj session-state))
-         (apply callback))))
+    (as-> (cond-> [(get type-map type type) payload]
+            (has-session? decoder) (conj session-state))
+          args
+      (apply callback args))))
+
+(defn- tag-without-payload
+  [decoder t]
+  (let [result (callback (assoc decoder :type t :payload []))]
+    (as-> (cond-> decoder
+            (has-session? decoder) (assoc :session-state result))
+          decoder'
+      (reset-tlv-decoder decoder'))))
+
+(defn- tag-with-payload
+  [decoder t l]
+  (assoc decoder
+         :state :header
+         :header []
+         :type t
+         :required l))
 
 (defmethod tlv-decode-step :tag
   [decoder bytes]
   (let [[t l] (parse-tag (first bytes))]
-    (-> (if (zero? l)
-          (->> (assoc decoder :type t :payload [])
-               callback
-               (assoc decoder :session-state)
-               reset-tlv-decoder)
-          (assoc decoder
-                 :state :header
-                 :header []
-                 :type t
-                 :required l))
-        (tlv-decode (rest bytes)))))
+    (as-> (if (zero? l)
+            (tag-without-payload decoder t)
+            (tag-with-payload decoder t l))
+          decoder'
+      (tlv-decode decoder' (rest bytes)))))
 
 ;; Maximum number of bytes which can be read from the source without affecting the decoder state.
 (defn- readable-bytes
@@ -94,8 +107,7 @@
 (defn- read-next-bytes
   [decoder bytes]
   (let [readable (readable-bytes decoder bytes)]
-    (-> decoder
-        (update (:state decoder) concat (take readable bytes))
+    (-> (update decoder (:state decoder) concat (take readable bytes))
         (tlv-decode-step (drop readable bytes)))))
 
 (defn- bytes->num
@@ -103,29 +115,30 @@
   (if (empty? bytes)
     0
     (reduce
-      bit-or
-      (map-indexed
-        #(bit-shift-left
-           (bit-and %2 0x0FF)
-           (* 8 (- (dec (count bytes)) %1)))
-        bytes))))
- 
+     bit-or
+     (map-indexed
+      #(bit-shift-left
+        (bit-and %2 0x0FF)
+        (* 8 (- (dec (count bytes)) %1)))
+      bytes))))
+
 (defmethod tlv-decode-step :header
   [decoder bytes]
   (cond-> decoder
-    (reading-completed? decoder) (assoc
-                                   :state :payload
-                                   :required (bytes->num (:header decoder))
-                                   :payload [])
+    (reading-completed? decoder) (assoc :state :payload
+                                        :required (bytes->num (:header decoder))
+                                        :payload [])
     (not-empty bytes) (read-next-bytes bytes)))
 
 (defmethod tlv-decode-step :payload
   [decoder bytes]
   (if (reading-completed? decoder)
-    (-> decoder
-        (assoc :session-state (callback decoder))
-        reset-tlv-decoder
-        (tlv-decode bytes))
+    (let [result (callback decoder)]
+      (as-> (cond-> decoder
+              (has-session? decoder) (assoc :session-state result))
+            decoder'
+        (reset-tlv-decoder decoder')
+        (tlv-decode decoder' bytes)))
     (cond-> decoder
       (not-empty bytes) (read-next-bytes bytes))))
 
@@ -166,5 +179,3 @@
   "Prepends package header to a byte sequence."
   [t payload]
   (concat (tlv-header t (count payload)) payload))
-
-(defn foobar [])
