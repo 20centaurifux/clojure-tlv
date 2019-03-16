@@ -87,11 +87,12 @@
 
 (deftest max-size
   (testing "Max size."
-    (let [counter (atom -1)]
+    (let [counter (atom 0)]
       (is (= (-> (tlv-decoder (fn [_ _] (swap! counter inc)) :max-size 10)
                  (tlv-decode (tlv-encode 42 "hello world"))
                  :state)
-             :failed)))))
+             :failed))
+      (is (zero? @counter)))))
 
 (deftest failed-state
   (testing "Failed state."
