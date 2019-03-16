@@ -84,3 +84,22 @@
           (recur (rest bytes)
                  (tlv-decode decoder [b]))
           (= @counter 64))))))
+
+(deftest max-size
+  (testing "Max size."
+    (let [counter (atom -1)]
+      (is (= (-> (tlv-decoder (fn [_ _] (swap! counter inc)) :max-size 10)
+                 (tlv-decode (tlv-encode 42 "hello world"))
+                 :state)
+             :failed)))))
+
+(deftest failed-state
+  (testing "Failed state."
+    (let [uk (-> (tlv-decoder (fn [_ _]) :max-size 1)
+                 (tlv-decode (tlv-encode 42 "UK")))]
+      (is (failed? uk))
+      (is (not (valid? uk))))
+    (let [liechtenstein (-> (tlv-decoder (fn [_ _]) :max-size 13)
+                            (tlv-decode (tlv-encode 42 "Liechtenstein")))]
+      (is (valid? liechtenstein))
+      (is (not (failed? liechtenstein))))))

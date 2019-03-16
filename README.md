@@ -51,15 +51,14 @@ callback function is applied to each found package.
 	             t
 	             (apply str p))))
 
-	(tlv-decode
-	  (tlv-decoder print-package)
-	  (tlv-encode 23 "hello world"))
+	(-> (tlv-decoder print-package)
+	    (tlv-decode (tlv-encode 23 "hello world")))
 
 ### Mapping types
 
 Package types can be mapped to keywords by specifying a map.
 
-	(defmulti process-package (fn [a b] a))
+	(defmulti process-package (fn [t p] t))
 
 	(defmethod process-package :foo
 	  [t p]
@@ -69,34 +68,29 @@ Package types can be mapped to keywords by specifying a map.
 	  [t p]
 	  (println "bar => " p))
 
-	(def decoder (tlv-decoder
-	               process-package
-	               :type-map {23 :foo 42 :bar}))
-
-	(->>
-	  (mapcat
-	    (partial apply tlv-encode)
-	    (partition 2 [23 "foo" 42 "bar" 23 "f00" 23 "fo0" 42 "baz"]))
-	  (tlv-decode decoder))
+	(-> (tlv-decoder process-package :type-map {23 :foo 42 :bar})
+	    (tlv-decode (tlv-encode 23 "foo"))
+	    (tlv-decode (tlv-encode 42 "bar")))
 
 ### Session state
 
-Decoders can have a session state. You can set the initial value by providing
-the "session-state" keyword.
-
-	(tlv-decoder
-	  process-package
-	  :session-state {:authenticated? false})
+Decoders can have a session state. Set the initial value by providing the
+"session-state" keyword.
 
 If the session state is defined it's passed to the decoder's callback function
 as third argument and set to the return value.
 
-	(defn count-packages
-	  [t p s]
-	  (inc s))
+	(assert (zero? (-> (tlv-decoder (fn [t p s] (inc s)) :session-state -1)
+                           (tlv-decode (tlv-encode 5 "hello world"))
+                           :session-state)))
 
-	(tlv-decoder count-packages :session-state 0)
+### Message size limit
 
-	(:session-state (tlv-decode
-	                  (tlv-decoder count-packages :session-state 0)
-	                  (tlv-encode 5 "hello world")))
+A payload size limit can be set when defining a decoder. If a message exceeds the
+specified limit the decoder becomes invalid. Any new data will be ignored.
+
+	(let [decoder (-> (tlv-decoder (fn [t p s] (inc s)) :session-state 0 :max-size 1)
+	                  (tlv-decode (tlv-encode 1 "a"))
+	                  (tlv-decode (tlv-encode 1 "bc")))]
+	  (assert (= (:session-state decoder) 1))
+	  (assert (failed? decoder)))
