@@ -103,10 +103,23 @@ specified limit the decoder becomes invalid. Any new data will be ignored.
 **clojure-tlv** provides a simple [core.async](https://github.com/clojure/core.async) wrapper.
 
 	(require '[clojure-tlv.async :as async]
-	         '[clojure.core.async :refer [>!!]])
+	         '[clojure.core.async :refer [>!! chan]])
 
 	(def c (-> (tlv/decoder (fn [_ p] (println (apply str p))))
 	           async/decoder->chan))
 
 	(>!! c (concat (tlv/encode 0 "foo")
 	               (tlv/encode 1 "bar")))
+
+Alternatively you can use the decode-async macro.
+
+	(def c (chan))
+
+	(async/decode-async c
+	                    {:session-state 1}
+	                    [t p s] (do
+	                              (println (format "package %d => %s" s (apply str p)))
+	                              (inc s))
+	                    [e] (println "error => " e))
+
+	(>!! c (tlv/encode 1 "foobar"))
