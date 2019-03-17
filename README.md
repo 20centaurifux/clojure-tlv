@@ -97,3 +97,16 @@ specified limit the decoder becomes invalid. Any new data will be ignored.
 	  (assert (= (:session-state decoder) 1))
 	  (assert (tlv/failed? decoder))
 	  (assert (not (tlv/valid? decoder))))
+
+### Async support
+
+**clojure-tlv** provides a simple [core.async](https://github.com/clojure/core.async) wrapper.
+
+	(require '[clojure-tlv.async :as async]
+	         '[clojure.core.async :refer [>!!]])
+
+	(def c (-> (tlv/decoder (fn [_ p] (println (apply str p))))
+	           async/decoder->chan))
+
+	(>!! c (concat (tlv/encode 0 "foo")
+	               (tlv/encode 1 "bar")))
