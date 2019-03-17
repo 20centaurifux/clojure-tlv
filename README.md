@@ -34,10 +34,12 @@ Variable-sized series of bytes.
 
 ## Encoding
 
-A package can be created with the tlv-encode function. It expects a package type
+A package can be created with the encode function. It expects a package type
 and a sequence.
 
-	(tlv-encode 23 "hello world")
+	(require '[clojure-tlv.core :as tlv])
+
+	(tlv/encode 23 "hello world")
 
 ## Decoding
 
@@ -51,10 +53,10 @@ callback function is applied to each found package.
 	             t
 	             (apply str p))))
 
-	(-> (tlv-decoder print-package)
-	    (tlv-decode (tlv-encode 23 "hello world")))
+	(-> (tlv/decoder print-package)
+	    (tlv/decode (tlv/encode 23 "hello world")))
 
-### Mapping types
+### Mapping types to keywords
 
 Package types can be mapped to keywords by specifying a map.
 
@@ -68,9 +70,9 @@ Package types can be mapped to keywords by specifying a map.
 	  [t p]
 	  (println "bar => " p))
 
-	(-> (tlv-decoder process-package :type-map {23 :foo 42 :bar})
-	    (tlv-decode (tlv-encode 23 "foo"))
-	    (tlv-decode (tlv-encode 42 "bar")))
+	(-> (tlv/decoder process-package :type-map {23 :foo 42 :bar})
+	    (tlv/decode (tlv/encode 23 "foo"))
+	    (tlv/decode (tlv/encode 42 "bar")))
 
 ### Session state
 
@@ -80,8 +82,8 @@ Decoders can have a session state. Set the initial value by providing the
 If the session state is defined it's passed to the decoder's callback function
 as third argument and set to the return value.
 
-	(assert (zero? (-> (tlv-decoder (fn [t p s] (inc s)) :session-state -1)
-                           (tlv-decode (tlv-encode 5 "hello world"))
+	(assert (zero? (-> (tlv/decoder (fn [t p s] (inc s)) :session-state -1)
+                           (tlv/decode (tlv/encode 5 "hello world"))
                            :session-state)))
 
 ### Message size limit
@@ -89,8 +91,9 @@ as third argument and set to the return value.
 A payload size limit can be set when defining a decoder. If a message exceeds the
 specified limit the decoder becomes invalid. Any new data will be ignored.
 
-	(let [decoder (-> (tlv-decoder (fn [t p s] (inc s)) :session-state 0 :max-size 1)
-	                  (tlv-decode (tlv-encode 1 "a"))
-	                  (tlv-decode (tlv-encode 1 "bc")))]
+	(let [decoder (-> (tlv/decoder (fn [t p s] (inc s)) :session-state 0 :max-size 1)
+	                  (tlv/decode (tlv/encode 1 "a"))
+	                  (tlv/decode (tlv/encode 1 "bc")))]
 	  (assert (= (:session-state decoder) 1))
-	  (assert (failed? decoder)))
+	  (assert (tlv/failed? decoder))
+	  (assert (not (tlv/valid? decoder))))

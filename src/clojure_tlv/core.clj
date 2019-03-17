@@ -5,7 +5,7 @@
   {:pre [(even? (count options))]}
   (apply hash-map options))
 
-(defn tlv-decoder
+(defn decoder
   "Creates the initial TLV decoder state. f is applied to found TLV packages."
   [f & options]
   (merge {:state :tag :callback f}
@@ -24,15 +24,15 @@
   ^{:doc "true if the decoder state is valid"}
   (comp not failed?))
 
-(defmulti ^:private tlv-decode-step :state)
+(defmulti ^:private decode-step :state)
 
-(defn tlv-decode
+(defn decode
   "Decodes bytes & updates the decoder state."
   [decoder bytes]
   (cond-> decoder
-    (not-empty bytes) (tlv-decode-step bytes)))
+    (not-empty bytes) (decode-step bytes)))
 
-(defmethod tlv-decode-step :failed
+(defmethod decode-step :failed
   [decoder bytes]
   decoder)
 
@@ -55,7 +55,7 @@
            (has-session? decoder) (conj session-state))
          (apply callback))))
 
-(defn- reset-tlv-decoder
+(defn- reset-decoder
   [decoder]
   (-> (select-keys decoder [:callback :type-map :session-state :max-size])
       (assoc :state :tag)))
@@ -65,7 +65,7 @@
   (let [result (apply-callback (assoc decoder :type t :payload []))]
     (-> (cond-> decoder
           (has-session? decoder) (assoc :session-state result))
-        reset-tlv-decoder)))
+        reset-decoder)))
 
 (defn- tag-with-payload
   [decoder t l]
@@ -92,13 +92,13 @@
 
 (def ^:private parse-tag (juxt tag->type tag->length))
 
-(defmethod tlv-decode-step :tag
+(defmethod decode-step :tag
   [decoder bytes]
   (let [[t l] (parse-tag (first bytes))]
     (-> (if (zero? l)
           (tag-without-payload decoder t)
           (tag-with-payload decoder t l))
-        (tlv-decode (rest bytes)))))
+        (decode (rest bytes)))))
 
 ;; Maximum number of bytes which can be read from the source without affecting the decoder state.
 (defn- readable-bytes
@@ -112,7 +112,7 @@
   [decoder bytes]
   (let [readable (readable-bytes decoder bytes)]
     (-> (update decoder (:state decoder) concat (take readable bytes))
-        (tlv-decode-step (drop readable bytes)))))
+        (decode-step (drop readable bytes)))))
 
 (defn- bytes->num
   [bytes]
@@ -149,20 +149,20 @@
            :else {:state :payload :required size :payload []})
          (merge decoder))))
 
-(defmethod tlv-decode-step :header
+(defmethod decode-step :header
   [decoder bytes]
   (let [decoder' (start-payload decoder)]
     (cond-> decoder'
       (valid? decoder') (read-next-bytes bytes))))
 
-(defmethod tlv-decode-step :payload
+(defmethod decode-step :payload
   [decoder bytes]
   (if (reading-completed? decoder)
     (let [result (apply-callback decoder)]
       (-> (cond-> decoder
             (has-session? decoder) (assoc :session-state result))
-          reset-tlv-decoder
-          (tlv-decode bytes)))
+          reset-decoder
+          (decode bytes)))
     (cond-> decoder
       (not-empty bytes) (read-next-bytes bytes))))
 
@@ -194,14 +194,14 @@
             (bit-shift-right (bit-and l 0x0000FF00) 8)
             (bit-and l 0x000000FF)]))
 
-(defn tlv-header
+(defn header
   "Returns a byte sequence containing package tag & length."
   [t l]
   (cons (tag t l)
         (num->bytes l)))
 
-(defn tlv-encode
+(defn encode
   "Prepends package header to a byte sequence."
   [t payload]
-  (concat (tlv-header t (count payload))
+  (concat (header t (count payload))
           payload))
