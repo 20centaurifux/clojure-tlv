@@ -37,99 +37,110 @@ Variable-sized series of bytes.
 A package can be created with the encode function. It expects a package type
 and a sequence.
 
-	(require '[clojure-tlv.core :as tlv])
+	=> (require '[clojure-tlv.core :as tlv])
 
-	(tlv/encode 23 "hello world")
+	=> (tlv/encode 23 "hello world")
+	(87 11 104 101 108 108 111 32 119 111 114 108 100)
 
 ## Decoding
 
 To decode packages **clojure-tlv** provides a pure functional decoder. A
 callback function is applied to each found package.
 
-	(defn print-package
-	  [t p]
-	  (println (format
-	             "type: %d, payload: %s"
-	             t
-	             (apply str p))))
+	=> (defn ->string
+	     [p]
+	     (apply str (map char p)))
 
-	(-> (tlv/decoder print-package)
-	    (tlv/decode (tlv/encode 23 "hello world")))
+	=> (defn print-package
+	     [t p]
+	     (println (format
+	                "type: %d, payload: %s"
+	                t
+	                (->string p))))
+
+	=> (-> (tlv/decoder print-package)
+	       (tlv/decode (tlv/encode 23 "hello world")))
 
 ### Mapping types to keywords
 
-Package types can be mapped to keywords by specifying a map.
+Package types can be mapped to keywords automatically.
 
-	(defmulti process-package (fn [t p] t))
+	=> (defmulti process-package (fn [t p] t))
 
-	(defmethod process-package :foo
-	  [t p]
-	  (println "foo => " p))
+	=> (defmethod process-package :foo
+	     [t p]
+	     (println "I'm a foo => " (->string p)))
 
 	(defmethod process-package :bar
 	  [t p]
-	  (println "bar => " p))
+	  (println "I'm a bar => " (->string p)))
 
-	(-> (tlv/decoder process-package :type-map {23 :foo 42 :bar})
+	(-> (tlv/decoder process-package :type-map {23 :foo
+                                              42 :bar})
 	    (tlv/decode (tlv/encode 23 "foo"))
 	    (tlv/decode (tlv/encode 42 "bar")))
 
 ### Session state
 
-Decoders can have a session state. Set the initial value by providing the
-"session-state" keyword.
+It's also possible to implement a stateful decoder by setting an initial session state.
+The state is passed to the decoder's callback function as third argument and set to the
+return value.
 
-If the session state is defined it's passed to the decoder's callback function
-as third argument and set to the return value.
-
-	(assert (zero? (-> (tlv/decoder (fn [t p s] (inc s)) :session-state -1)
-                           (tlv/decode (tlv/encode 5 "hello world"))
-                           :session-state)))
+	=> (assert (zero? (-> (tlv/decoder (fn
+	                                     [t p s]
+	                                     (inc s))
+	                                   :session-state -1)
+	                      (tlv/decode (tlv/encode 5 "hello world"))
+	                      :session-state)))
 
 ### Message size limit
 
 A payload size limit can be set when defining a decoder. If a message exceeds the
 specified limit the decoder becomes invalid. Any new data will be ignored.
 
-	(let [decoder (-> (tlv/decoder (fn [t p s] (inc s)) :session-state 0 :max-size 1)
-	                  (tlv/decode (tlv/encode 1 "a"))
-	                  (tlv/decode (tlv/encode 1 "bc")))]
-	  (assert (= (:session-state decoder) 1))
-	  (assert (tlv/failed? decoder))
-	  (assert (not (tlv/valid? decoder))))
+	=> (let [decoder (-> (tlv/decoder (fn
+	                                    [t p s]
+	                                    (inc s))
+	                                  :session-state -1
+	                                  :max-size 1)
+	                     (tlv/decode (tlv/encode 1 "a"))
+	                     (tlv/decode (tlv/encode 1 "bc")))]
+	     (assert (zero? (:session-state decoder)))
+	     (assert (tlv/failed? decoder))
+	     (assert (not (tlv/valid? decoder))))
 
 ### Async support
 
 **clojure-tlv** provides a simple [core.async](https://github.com/clojure/core.async) wrapper.
 
-	(require '[clojure-tlv.async :as async]
-	         '[clojure.core.async :refer [>!! chan close!]])
+	=> (require '[clojure-tlv.async :as async]
+	            '[clojure.core.async :refer [>!! chan close!]])
 
-	(def c (-> (tlv/decoder (fn [_ p] (println (apply str p))))
-	           async/decoder->chan))
+	=> (def c (-> (tlv/decoder print-package)
+	              async/decoder->chan))
 
-	(>!! c (concat (tlv/encode 0 "foo")
-	               (tlv/encode 1 "bar")))
+	=> (>!! c (concat (tlv/encode 1 "foo")
+	                  (tlv/encode 2 "bar")))
 
-Alternatively you can use the decode-async macro.
+Alternatively you can use the convenient decode-async macro.
 
-	(def c (chan))
+	=> (def c (chan))
 
-	(async/decode-async c
-	                    ; decoder options
-	                    {:session-state 1
-	                     :max-size 256}
+	=> (async/decode-async c
+	                       ; decoder options
+	                       {:session-state 1
+	                        :max-size 256}
 
-	                    ; package received
-	                    ([t p s]
-	                     (println (format "package %d => %s"
-	                                      s
-	                                      (apply str p)))
-	                     (inc s))
+	                       ; package received
+	                       ([t p s]
+	                        (println (format "package %d => %s"
+	                                         s
+	                                         (apply str (map char p))))
+	                        (inc s))
 
-	                    ; error (channel is not closed automatically)
-	                    ([e]
-	                     (println "error => " e)
-	                     (close! c)))
+	                       ; error (channel is not closed automatically)
+	                       ([e]
+	                        (println "error => " e)
+	                        (close! c)))
 
-	(>!! c (tlv/encode 1 "foobar"))
+	=> (>!! c (tlv/encode 1 "foobar"))

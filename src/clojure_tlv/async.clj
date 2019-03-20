@@ -30,7 +30,9 @@
                 {:sessions-state 1}
 
                 ([t p s]
-                 (println (format \"package %d => %s\" s (apply str p)))
+                 (println (format \"package %d received => %s\"
+                                  s
+                                  (apply str (map char p))))
 	               (inc s))
 
                 ([e]

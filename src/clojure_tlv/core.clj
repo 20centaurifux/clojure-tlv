@@ -204,4 +204,4 @@
   "Prepends package header to a byte sequence."
   [t payload]
   (concat (header t (count payload))
-          payload))
+          (map byte payload)))
