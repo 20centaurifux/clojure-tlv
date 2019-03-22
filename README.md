@@ -49,7 +49,7 @@ callback function is applied to each found package.
 
 	=> (defn ->string
 	     [p]
-	     (apply str (map char p)))
+	     (String. (byte-array p)))
 
 	=> (defn print-package
 	     [t p]
@@ -135,7 +135,7 @@ Alternatively you can use the convenient decode-async macro.
 	                       ([t p s]
 	                        (println (format "package %d => %s"
 	                                         s
-	                                         (apply str (map char p))))
+	                                         (String. (byte-array p))))
 	                        (inc s))
 
 	                       ; error (channel is not closed automatically)
