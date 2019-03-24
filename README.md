@@ -109,6 +109,24 @@ specified limit the decoder becomes invalid. Any new data will be ignored.
 	     (assert (tlv/failed? decoder))
 	     (assert (not (tlv/valid? decoder))))
 
+;(def pkg (encode 1 (concat (encode 2 "hello") (encode 2 "world"))))
+
+### Nested packages
+
+**clojure-tlv** offers a function to unpack nested packages.
+
+	=> (defn unpack-container
+	     [t p]
+	     (when-let [children (tlv/unpack p)]
+	       (println (clojure.string/join " "
+	                                     (map #(->string (second %))
+	                                          children)))))
+
+	=> (-> (tlv/decoder unpack-container)
+	       (tlv/decode (tlv/encode 1 (concat (tlv/encode 2 "klaatu")
+	                                         (tlv/encode 2 "barada")
+	                                         (tlv/encode 2 "nikto")))))
+
 ### Async support
 
 **clojure-tlv** provides a simple [core.async](https://github.com/clojure/core.async) wrapper.

@@ -1,6 +1,7 @@
 (ns clojure-tlv.async
   (:require [clojure-tlv.core :as tlv]
-            [clojure.core.async :refer [go-loop <! chan close!]]))
+            [clojure.core.async :refer [go-loop <! chan close!]])
+  (:gen-class))
 
 (defn decoder->chan
   "Creates an asynchronous channel and connects it to decoder. The

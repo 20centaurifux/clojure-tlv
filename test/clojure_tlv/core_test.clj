@@ -104,3 +104,21 @@
                             (tlv/decode (tlv/encode 42 "Liechtenstein")))]
       (is (tlv/valid? liechtenstein))
       (is (not (tlv/failed? liechtenstein))))))
+
+(deftest valid-unpack
+  (testing "Nested packages."
+    (let [parent (drop 2 (tlv/encode 1 (concat (tlv/encode 2 "hello")
+                                               (tlv/encode 3 "world"))))
+          [a b] (tlv/unpack parent :type-map {1 :parent
+                                              2 :child1
+                                              3 :child2})]
+      (is (= (first a) :child1))
+      (is (= (String. (byte-array (second a))) "hello"))
+      (is (= (first b) :child2))
+      (is (= (String. (byte-array (second b))) "world")))))
+
+(deftest invalid-unpack
+  (testing "Invalid nested packages."
+    (let [parent (drop 2 (tlv/encode 1 (concat (tlv/encode 1 "hello")
+                                               (tlv/encode 2 "world"))))]
+      (is (nil? (tlv/unpack (butlast parent)))))))

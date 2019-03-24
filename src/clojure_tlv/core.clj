@@ -1,4 +1,5 @@
-(ns clojure-tlv.core)
+(ns clojure-tlv.core
+  (:gen-class))
 
 (defn- options->map
   [options]
@@ -165,6 +166,19 @@
           (decode bytes)))
     (cond-> decoder
       (not-empty bytes) (read-next-bytes bytes))))
+
+(defn unpack
+  "Unpacks nested packages. Returns a list of type & payload tuples
+  or nil on failure."
+  [payload & {:keys [type-map] :or {:type-map {}}}]
+  (let [d (-> (decoder (fn [t p s]
+                         (conj s
+                               (list (get type-map t t) p)))
+                       :session-state [])
+              (decode payload))]
+    (when (and (valid? d)
+               (= (:state d) :tag))
+      (apply list (:session-state d)))))
 
 (defn- required-header-size
   [l]
