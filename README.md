@@ -71,14 +71,14 @@ Package types can be mapped to keywords automatically.
 	     [t p]
 	     (println "I'm a foo => " (->string p)))
 
-	(defmethod process-package :bar
-	  [t p]
-	  (println "I'm a bar => " (->string p)))
+	=> (defmethod process-package :bar
+	    [t p]
+	    (println "I'm a bar => " (->string p)))
 
-	(-> (tlv/decoder process-package :type-map {23 :foo
-                                              42 :bar})
-	    (tlv/decode (tlv/encode 23 "foo"))
-	    (tlv/decode (tlv/encode 42 "bar")))
+	=> (-> (tlv/decoder process-package :type-map {23 :foo
+	                                               42 :bar})
+	       (tlv/decode (tlv/encode 23 "foo"))
+	       (tlv/decode (tlv/encode 42 "bar")))
 
 ### Session state
 
@@ -86,8 +86,7 @@ It's also possible to implement a stateful decoder by setting an initial session
 The state is passed to the decoder's callback function as third argument and set to the
 return value.
 
-	=> (assert (zero? (-> (tlv/decoder (fn
-	                                     [t p s]
+	=> (assert (zero? (-> (tlv/decoder (fn [t p s]
 	                                     (inc s))
 	                                   :session-state -1)
 	                      (tlv/decode (tlv/encode 5 "hello world"))
@@ -98,8 +97,7 @@ return value.
 A payload size limit can be set when defining a decoder. If a message exceeds the
 specified limit the decoder becomes invalid. Any new data will be ignored.
 
-	=> (let [decoder (-> (tlv/decoder (fn
-	                                    [t p s]
+	=> (let [decoder (-> (tlv/decoder (fn [t p s]
 	                                    (inc s))
 	                                  :session-state -1
 	                                  :max-size 1)
@@ -108,8 +106,6 @@ specified limit the decoder becomes invalid. Any new data will be ignored.
 	     (assert (zero? (:session-state decoder)))
 	     (assert (tlv/failed? decoder))
 	     (assert (not (tlv/valid? decoder))))
-
-;(def pkg (encode 1 (concat (encode 2 "hello") (encode 2 "world"))))
 
 ### Nested packages
 
