@@ -1,5 +1,4 @@
-(ns clojure-tlv.core
-  (:gen-class))
+(ns clojure-tlv.core)
 
 (defn- options->map
   [options]
@@ -170,7 +169,7 @@
 (defn unpack
   "Unpacks nested packages. Returns a list of type & payload tuples
   or nil on failure."
-  [payload & {:keys [type-map] :or {:type-map {}}}]
+  [payload & {:keys [type-map] :or {type-map {}}}]
   (let [d (-> (decoder (fn [t p s]
                          (conj s
                                (list (get type-map t t) p)))

@@ -3,7 +3,7 @@
   :url "https://github.com/20centaurifux/clojure-tlv"
   :license {:name "GPLv3"
             :url "https://www.gnu.org/licenses/gpl-3.0.txt"}
-  :dependencies [[org.clojure/clojure "1.8.0"]
+  :dependencies [[org.clojure/clojure "1.10.0"]
                  [org.clojure/core.async "0.4.490"]]
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}}
